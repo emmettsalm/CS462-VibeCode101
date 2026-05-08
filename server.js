@@ -1,3 +1,13 @@
+/*
+ * Thai Numeral Recognition — Web Server
+ * CS462 Coding Assignment
+ *
+ * Team Members:
+ *   อนาวินธุ์ อักษรทิพย์      1660701440
+ *   ดฤพล กรณ์ถาวรวงศ์        1660703974
+ *   เอ็มเม็ต มีชัย แซลมอน     1660704444
+ *   ธนวัฒน์ วิเศษชัยวรรณ      1660703990
+ */
 const express  = require('express');
 const path     = require('path');
 const fs       = require('fs');

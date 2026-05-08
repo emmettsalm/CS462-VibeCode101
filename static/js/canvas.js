@@ -1,3 +1,13 @@
+/*
+ * Thai Numeral Recognition — Canvas & Predict Logic
+ * CS462 Coding Assignment
+ *
+ * Team Members:
+ *   อนาวินธุ์ อักษรทิพย์      1660701440
+ *   ดฤพล กรณ์ถาวรวงศ์        1660703974
+ *   เอ็มเม็ต มีชัย แซลมอน     1660704444
+ *   ธนวัฒน์ วิเศษชัยวรรณ      1660703990
+ */
 (function () {
   const canvas    = document.getElementById('drawCanvas');
   const ctx       = canvas.getContext('2d');

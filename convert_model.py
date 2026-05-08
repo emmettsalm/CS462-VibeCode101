@@ -2,6 +2,12 @@
 Convert models/model.h5 → models/tfjs/
 Saves weights as binary + shapes JSON (no Keras topology — bypasses Keras 3 incompatibility)
 Run: python convert_model.py
+
+Team Members:
+    อนาวินธุ์ อักษรทิพย์      1660701440
+    ดฤพล กรณ์ถาวรวงศ์        1660703974
+    เอ็มเม็ต มีชัย แซลมอน     1660704444
+    ธนวัฒน์ วิเศษชัยวรรณ      1660703990
 """
 import os, json
 import numpy as np

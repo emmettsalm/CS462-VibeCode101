@@ -6,6 +6,12 @@ Dataset expected at: ./dataset_thai_v4/  (one subfolder per class)
 Usage:
     python train_model.py
     python train_model.py --data ./dataset_thai_v4 --epochs 30
+
+Team Members:
+    อนาวินธุ์ อักษรทิพย์      1660701440
+    ดฤพล กรณ์ถาวรวงศ์        1660703974
+    เอ็มเม็ต มีชัย แซลมอน     1660704444
+    ธนวัฒน์ วิเศษชัยวรรณ      1660703990
 """
 import os
 import argparse

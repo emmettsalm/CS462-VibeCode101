@@ -7,9 +7,6 @@ npm-debug.log*
 models/model.h5
 models/model.keras
 
-# Dataset (large — keep locally)
-dataset_thai_v4/
-
 # OS
 .DS_Store
 Thumbs.db
