@@ -8,6 +8,70 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Sarabun:wght@400;500;600;700&display=swap" />
   <link rel="stylesheet" href="/static/css/style.css" />
+  <style>
+    .meta-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: .65rem;
+      margin-top: .75rem;
+    }
+    @media (max-width: 480px) { .meta-grid { grid-template-columns: 1fr; } }
+    .meta-item {
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 10px;
+      padding: .75rem 1rem;
+    }
+    .meta-label {
+      font-size: .68rem;
+      font-weight: 600;
+      letter-spacing: 1.1px;
+      text-transform: uppercase;
+      color: rgba(241,245,249,.4);
+      margin-bottom: .3rem;
+    }
+    .meta-value {
+      font-size: .92rem;
+      font-weight: 700;
+      color: #f1f5f9;
+      word-break: break-all;
+    }
+    .meta-value.accent { color: var(--accent); }
+    .badge-default {
+      display: inline-block;
+      background: rgba(52,211,153,.12);
+      color: #34d399;
+      border: 1px solid rgba(52,211,153,.25);
+      border-radius: 6px;
+      padding: 1px 9px;
+      font-size: .72rem;
+      font-weight: 700;
+      margin-left: .4rem;
+      vertical-align: middle;
+    }
+    .badge-custom {
+      display: inline-block;
+      background: rgba(167,139,250,.12);
+      color: var(--accent);
+      border: 1px solid rgba(167,139,250,.25);
+      border-radius: 6px;
+      padding: 1px 9px;
+      font-size: .72rem;
+      font-weight: 700;
+      margin-left: .4rem;
+      vertical-align: middle;
+    }
+    .section-title {
+      font-size: .72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1.1px;
+      color: rgba(241,245,249,.38);
+      margin-bottom: .75rem;
+      margin-top: 1.25rem;
+    }
+    .section-title:first-of-type { margin-top: 0; }
+  </style>
 </head>
 <body>
   <nav class="navbar">
@@ -21,22 +85,41 @@
   <main class="container">
     <div class="page-header">
       <h1>หน้า Admin</h1>
-      <p class="subtitle">อัปโหลดและจัดการโมเดล</p>
+      <p class="subtitle">จัดการและตรวจสอบโมเดล</p>
     </div>
 
     <div class="admin-grid">
+
+      <!-- ── Status + Info ── -->
       <div class="admin-card glass-card">
-        <h2>สถานะโมเดลปัจจุบัน</h2>
+        <p class="section-title">สถานะโมเดล</p>
         <div class="status-row">
           <div class="status-dot status-err" id="statusDot"></div>
           <span id="statusText">กำลังตรวจสอบ…</span>
         </div>
-        <button class="btn btn-outline mt-2" onclick="checkStatus()">รีเฟรช</button>
+
+        <p class="section-title" style="margin-top:1.25rem">ข้อมูลโมเดลที่ใช้งาน</p>
+        <div class="meta-grid" id="metaGrid">
+          <div class="meta-item"><div class="meta-label">Source</div><div class="meta-value" id="mSource">—</div></div>
+          <div class="meta-item"><div class="meta-label">Loaded at</div><div class="meta-value" id="mLoadedAt">—</div></div>
+          <div class="meta-item"><div class="meta-label">Parameters</div><div class="meta-value accent" id="mParams">—</div></div>
+          <div class="meta-item"><div class="meta-label">Weight tensors</div><div class="meta-value accent" id="mTensors">—</div></div>
+          <div class="meta-item"><div class="meta-label">File size</div><div class="meta-value" id="mSize">—</div></div>
+          <div class="meta-item"><div class="meta-label">Input shape</div><div class="meta-value" id="mInput">—</div></div>
+          <div class="meta-item" style="grid-column:1/-1"><div class="meta-label">Classes</div><div class="meta-value" id="mClasses">—</div></div>
+        </div>
+
+        <div style="display:flex;gap:.6rem;margin-top:1rem">
+          <button class="btn btn-outline" style="flex:0 0 auto;padding:.5rem .9rem;font-size:.8rem" onclick="checkStatus()">รีเฟรช</button>
+          <button class="btn btn-ghost"   style="flex:0 0 auto;padding:.5rem .9rem;font-size:.8rem" id="resetBtn" onclick="resetModel()">รีเซตโมเดล</button>
+        </div>
+        <div id="resetMsg" class="upload-msg" style="display:none"></div>
       </div>
 
+      <!-- ── Upload ── -->
       <div class="admin-card glass-card">
-        <h2>อัปโหลดโมเดลใหม่</h2>
-        <p class="hint-text">รองรับไฟล์ .h5 และ .keras เท่านั้น (Local mode only)</p>
+        <p class="section-title">อัปโหลดโมเดลใหม่</p>
+        <p class="hint-text">รองรับ .h5 และ .keras — ใช้ได้เฉพาะ Local mode</p>
 
         <div class="upload-zone" id="uploadZone">
           <div class="upload-icon">📦</div>
@@ -57,20 +140,35 @@
         <div id="uploadMsg" class="upload-msg" style="display:none"></div>
       </div>
     </div>
-
-    <div class="admin-card glass-card info-card">
-      <h2>ข้อมูลระบบ</h2>
-      <table class="info-table">
-        <tr><td>Classes</td><td><strong>๕๖, ๕๗, ๕๘, ๕๙, ๖๐</strong></td></tr>
-        <tr><td>Input Size</td><td>28 × 28 grayscale</td></tr>
-        <tr><td>Runtime</td><td>Node.js + TensorFlow.js</td></tr>
-        <tr><td>API Predict</td><td><code>POST /api/predict</code></td></tr>
-        <tr><td>API Upload</td><td><code>POST /api/upload_model</code></td></tr>
-      </table>
-    </div>
   </main>
 
   <script>
+    function fmt(n) { return n.toLocaleString(); }
+    function fmtTime(iso) {
+      if (!iso) return '—';
+      const d = new Date(iso);
+      return d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+           + '  ' + d.toLocaleDateString('th-TH');
+    }
+
+    function applyMeta(meta) {
+      if (!meta) return;
+      const isDefault = meta.isDefault;
+      document.getElementById('mSource').innerHTML =
+        meta.source + (isDefault
+          ? '<span class="badge-default">Default</span>'
+          : '<span class="badge-custom">Custom</span>');
+      document.getElementById('mLoadedAt').textContent = fmtTime(meta.loadedAt);
+      document.getElementById('mParams').textContent   = fmt(meta.numParams) + ' params';
+      document.getElementById('mTensors').textContent  = meta.numTensors + ' tensors';
+      document.getElementById('mSize').textContent     = meta.fileSizeKB + ' KB';
+      document.getElementById('mInput').textContent    = meta.inputShape;
+      document.getElementById('mClasses').textContent  = (meta.classes || []).join('  ');
+
+      // Show/hide reset button (only meaningful when custom model is loaded)
+      document.getElementById('resetBtn').style.display = isDefault ? 'none' : '';
+    }
+
     async function checkStatus() {
       try {
         const res  = await fetch('/api/model_status');
@@ -79,8 +177,30 @@
           'status-dot ' + (data.loaded ? 'status-ok' : 'status-err');
         document.getElementById('statusText').textContent =
           data.loaded ? 'โมเดลพร้อมใช้งาน' : 'ยังไม่มีโมเดล';
+        applyMeta(data.meta);
       } catch (e) {
         document.getElementById('statusText').textContent = 'ไม่สามารถเชื่อมต่อได้';
+      }
+    }
+
+    async function resetModel() {
+      const btn = document.getElementById('resetBtn');
+      const msg = document.getElementById('resetMsg');
+      btn.disabled = true;
+      msg.style.display = 'none';
+      try {
+        const res  = await fetch('/api/reset_model', { method: 'POST' });
+        const data = await res.json();
+        msg.style.display = 'block';
+        msg.className = 'upload-msg ' + (res.ok ? 'msg-success' : 'msg-error');
+        msg.textContent = (res.ok ? '✅ ' : '❌ ') + (data.message || data.error);
+        if (res.ok) { applyMeta(data.meta); checkStatus(); }
+      } catch (e) {
+        msg.style.display = 'block';
+        msg.className = 'upload-msg msg-error';
+        msg.textContent = '❌ ' + e.message;
+      } finally {
+        btn.disabled = false;
       }
     }
 
@@ -118,7 +238,7 @@
       prog.style.display = 'block'; bar.style.width = '0%';
 
       let pct = 0;
-      const timer = setInterval(() => { bar.style.width = Math.min(pct += 8, 85) + '%'; }, 200);
+      const timer = setInterval(() => { bar.style.width = Math.min(pct += 6, 85) + '%'; }, 250);
 
       try {
         const res  = await fetch('/api/upload_model', { method: 'POST', body: formData });
@@ -127,7 +247,7 @@
         msg.style.display = 'block';
         msg.className = 'upload-msg ' + (res.ok ? 'msg-success' : 'msg-error');
         msg.textContent = (res.ok ? '✅ ' : '❌ ') + (data.message || data.error);
-        if (res.ok) checkStatus();
+        if (res.ok) { applyMeta(data.meta); checkStatus(); }
       } catch (e) {
         clearInterval(timer);
         msg.style.display = 'block';
