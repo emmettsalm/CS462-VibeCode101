@@ -1,0 +1,16 @@
+{
+  "name": "thai-numeral-recognition",
+  "version": "1.0.0",
+  "description": "Thai handwritten numeral recognition — classes ๕๖ ๕๗ ๕๘ ๕๙ ๖๐",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "@tensorflow/tfjs": "^4.22.0",
+    "express": "^4.19.2",
+    "multer": "^1.4.5-lts.1",
+    "jimp": "^0.22.12"
+  }
+}

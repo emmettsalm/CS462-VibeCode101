@@ -1,0 +1,136 @@
+[
+  {
+    "name": "kernel",
+    "shape": [
+      3,
+      3,
+      1,
+      32
+    ]
+  },
+  {
+    "name": "bias",
+    "shape": [
+      32
+    ]
+  },
+  {
+    "name": "gamma",
+    "shape": [
+      32
+    ]
+  },
+  {
+    "name": "beta",
+    "shape": [
+      32
+    ]
+  },
+  {
+    "name": "kernel",
+    "shape": [
+      3,
+      3,
+      32,
+      32
+    ]
+  },
+  {
+    "name": "bias",
+    "shape": [
+      32
+    ]
+  },
+  {
+    "name": "kernel",
+    "shape": [
+      3,
+      3,
+      32,
+      64
+    ]
+  },
+  {
+    "name": "bias",
+    "shape": [
+      64
+    ]
+  },
+  {
+    "name": "gamma",
+    "shape": [
+      64
+    ]
+  },
+  {
+    "name": "beta",
+    "shape": [
+      64
+    ]
+  },
+  {
+    "name": "kernel",
+    "shape": [
+      3,
+      3,
+      64,
+      64
+    ]
+  },
+  {
+    "name": "bias",
+    "shape": [
+      64
+    ]
+  },
+  {
+    "name": "kernel",
+    "shape": [
+      3136,
+      512
+    ]
+  },
+  {
+    "name": "bias",
+    "shape": [
+      512
+    ]
+  },
+  {
+    "name": "kernel",
+    "shape": [
+      512,
+      5
+    ]
+  },
+  {
+    "name": "bias",
+    "shape": [
+      5
+    ]
+  },
+  {
+    "name": "moving_mean",
+    "shape": [
+      32
+    ]
+  },
+  {
+    "name": "moving_variance",
+    "shape": [
+      32
+    ]
+  },
+  {
+    "name": "moving_mean",
+    "shape": [
+      64
+    ]
+  },
+  {
+    "name": "moving_variance",
+    "shape": [
+      64
+    ]
+  }
+]

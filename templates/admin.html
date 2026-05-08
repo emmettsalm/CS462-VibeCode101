@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin — Thai Numeral Recognition</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Sarabun:wght@400;500;600;700&display=swap" />
+  <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+<body>
+  <nav class="navbar">
+    <span class="nav-brand"><span class="dot"></span> Thai Numeral Recognition</span>
+    <div class="nav-links">
+      <a href="/">หน้าหลัก</a>
+      <a href="/admin" class="active">Admin</a>
+    </div>
+  </nav>
+
+  <main class="container">
+    <div class="page-header">
+      <h1>หน้า Admin</h1>
+      <p class="subtitle">อัปโหลดและจัดการโมเดล</p>
+    </div>
+
+    <div class="admin-grid">
+      <div class="admin-card glass-card">
+        <h2>สถานะโมเดลปัจจุบัน</h2>
+        <div class="status-row">
+          <div class="status-dot status-err" id="statusDot"></div>
+          <span id="statusText">กำลังตรวจสอบ…</span>
+        </div>
+        <button class="btn btn-outline mt-2" onclick="checkStatus()">รีเฟรช</button>
+      </div>
+
+      <div class="admin-card glass-card">
+        <h2>อัปโหลดโมเดลใหม่</h2>
+        <p class="hint-text">รองรับไฟล์ .h5 และ .keras เท่านั้น (Local mode only)</p>
+
+        <div class="upload-zone" id="uploadZone">
+          <div class="upload-icon">📦</div>
+          <p>ลากไฟล์มาวางที่นี่ หรือ</p>
+          <label class="btn btn-outline upload-label" for="modelFile">เลือกไฟล์</label>
+          <input type="file" id="modelFile" accept=".h5,.keras" style="display:none"
+                 onchange="handleFileSelect(this)" />
+          <p id="selectedFileName" class="selected-file"></p>
+        </div>
+
+        <button class="btn btn-primary mt-2" id="uploadBtn" onclick="uploadModel()" disabled>
+          อัปโหลด
+        </button>
+
+        <div id="uploadProgress" class="progress-bar-wrap" style="display:none">
+          <div class="progress-bar" id="progressBar"></div>
+        </div>
+        <div id="uploadMsg" class="upload-msg" style="display:none"></div>
+      </div>
+    </div>
+
+    <div class="admin-card glass-card info-card">
+      <h2>ข้อมูลระบบ</h2>
+      <table class="info-table">
+        <tr><td>Classes</td><td><strong>๕๖, ๕๗, ๕๘, ๕๙, ๖๐</strong></td></tr>
+        <tr><td>Input Size</td><td>28 × 28 grayscale</td></tr>
+        <tr><td>Runtime</td><td>Node.js + TensorFlow.js</td></tr>
+        <tr><td>API Predict</td><td><code>POST /api/predict</code></td></tr>
+        <tr><td>API Upload</td><td><code>POST /api/upload_model</code></td></tr>
+      </table>
+    </div>
+  </main>
+
+  <script>
+    async function checkStatus() {
+      try {
+        const res  = await fetch('/api/model_status');
+        const data = await res.json();
+        document.getElementById('statusDot').className =
+          'status-dot ' + (data.loaded ? 'status-ok' : 'status-err');
+        document.getElementById('statusText').textContent =
+          data.loaded ? 'โมเดลพร้อมใช้งาน' : 'ยังไม่มีโมเดล';
+      } catch (e) {
+        document.getElementById('statusText').textContent = 'ไม่สามารถเชื่อมต่อได้';
+      }
+    }
+
+    function handleFileSelect(input) {
+      const name = input.files[0]?.name || '';
+      document.getElementById('selectedFileName').textContent = name ? `เลือก: ${name}` : '';
+      document.getElementById('uploadBtn').disabled = !name;
+    }
+
+    const zone = document.getElementById('uploadZone');
+    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+    zone.addEventListener('drop', e => {
+      e.preventDefault(); zone.classList.remove('drag-over');
+      const file = e.dataTransfer.files[0];
+      if (!file) return;
+      const dt = new DataTransfer(); dt.items.add(file);
+      const input = document.getElementById('modelFile');
+      input.files = dt.files; handleFileSelect(input);
+    });
+
+    async function uploadModel() {
+      const input = document.getElementById('modelFile');
+      if (!input.files[0]) return;
+
+      const formData = new FormData();
+      formData.append('model_file', input.files[0]);
+
+      const btn  = document.getElementById('uploadBtn');
+      const msg  = document.getElementById('uploadMsg');
+      const prog = document.getElementById('uploadProgress');
+      const bar  = document.getElementById('progressBar');
+
+      btn.disabled = true; msg.style.display = 'none';
+      prog.style.display = 'block'; bar.style.width = '0%';
+
+      let pct = 0;
+      const timer = setInterval(() => { bar.style.width = Math.min(pct += 8, 85) + '%'; }, 200);
+
+      try {
+        const res  = await fetch('/api/upload_model', { method: 'POST', body: formData });
+        const data = await res.json();
+        clearInterval(timer); bar.style.width = '100%';
+        msg.style.display = 'block';
+        msg.className = 'upload-msg ' + (res.ok ? 'msg-success' : 'msg-error');
+        msg.textContent = (res.ok ? '✅ ' : '❌ ') + (data.message || data.error);
+        if (res.ok) checkStatus();
+      } catch (e) {
+        clearInterval(timer);
+        msg.style.display = 'block';
+        msg.className = 'upload-msg msg-error';
+        msg.textContent = '❌ ' + e.message;
+      } finally {
+        btn.disabled = false;
+        setTimeout(() => { prog.style.display = 'none'; }, 1000);
+      }
+    }
+
+    checkStatus();
+  </script>
+</body>
+</html>

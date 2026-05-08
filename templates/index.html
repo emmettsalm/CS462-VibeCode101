@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Thai Numeral Recognition</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Sarabun:wght@400;500;600;700&display=swap" />
+  <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+<body>
+  <nav class="navbar">
+    <span class="nav-brand"><span class="dot"></span> Thai Numeral Recognition</span>
+    <div class="nav-links">
+      <a href="/" class="active">หน้าหลัก</a>
+      <a href="/admin">Admin</a>
+    </div>
+  </nav>
+
+  <main class="container">
+    <div class="page-header">
+      <h1>เขียนตัวเลขไทย</h1>
+      <p class="subtitle">วาดตัวเลขไทยหนึ่งในนี้:
+        <span class="class-badge">๕๖</span>
+        <span class="class-badge">๕๗</span>
+        <span class="class-badge">๕๘</span>
+        <span class="class-badge">๕๙</span>
+        <span class="class-badge">๖๐</span>
+      </p>
+    </div>
+
+    <div class="draw-section">
+      <div class="canvas-card glass-card">
+        <div class="canvas-wrapper" id="canvasWrapper">
+          <canvas id="drawCanvas" width="400" height="400"></canvas>
+          <div id="canvasHint" class="canvas-hint">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
+            </svg>
+            วาดตัวเลขที่นี่
+          </div>
+        </div>
+
+        <div class="canvas-controls">
+          <div class="tool-row">
+            <span class="tool-label">ขนาดปากกา</span>
+            <input type="range" id="brushSize" min="6" max="30" value="14" class="slider" />
+            <div class="brush-preview">
+              <div class="brush-dot" id="brushDot" style="width:14px;height:14px"></div>
+            </div>
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-ghost" id="clearBtn">ล้าง</button>
+            <button class="btn btn-primary" id="predictBtn">ทำนาย</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="result-card glass-card" id="resultCard">
+        <div id="resultPlaceholder" class="result-placeholder">
+          <div class="placeholder-icon">✏️</div>
+          <p>วาดตัวเลขแล้วกด "ทำนาย"</p>
+        </div>
+
+        <div id="resultContent" class="result-content" style="display:none">
+          <div class="prediction-box">
+            <span class="prediction-label">ผลการทำนาย</span>
+            <span class="prediction-value" id="predictionText">—</span>
+            <span class="confidence-pill" id="confidenceText"></span>
+          </div>
+          <div class="prob-section">
+            <h3>ความน่าจะเป็น</h3>
+            <div id="probBars"></div>
+          </div>
+        </div>
+
+        <div id="errorContent" class="error-content" style="display:none">
+          <div class="error-icon">⚠️</div>
+          <p id="errorText"></p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="/static/js/canvas.js"></script>
+</body>
+</html>
