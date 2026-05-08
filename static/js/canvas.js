@@ -45,7 +45,6 @@
   function startDraw(e) {
     e.preventDefault();
     drawing = true;
-    wrapper && wrapper.classList.add('drawing');
     const pos = getPos(e);
     ctx.beginPath();
     ctx.moveTo(pos.x, pos.y);
@@ -69,7 +68,6 @@
     if (!drawing) return;
     e.preventDefault();
     drawing = false;
-    wrapper && wrapper.classList.remove('drawing');
     ctx.beginPath();
   }
 

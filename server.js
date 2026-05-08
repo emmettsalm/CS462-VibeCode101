@@ -130,7 +130,7 @@ async function preprocessImage(base64Data) {
       sq[(yOff + y) * size + (xOff + x)] = cropPixels[y * cropW + x];
 
   // Resize to 28×28 with Jimp
-  const sqImg = new Jimp({ width: size, height: size, color: 0 });
+  const sqImg = new Jimp(size, size, 0x000000ff);
   sqImg.scan(0, 0, size, size, (x, y, idx) => {
     const v = sq[y * size + x];
     sqImg.bitmap.data[idx]     = v;
