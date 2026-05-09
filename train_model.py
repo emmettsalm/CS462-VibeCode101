@@ -205,6 +205,7 @@ def main():
 
     os.makedirs(args.out, exist_ok=True)
     metrics_dir = os.path.join(args.out, 'metrics')
+    os.makedirs(metrics_dir, exist_ok=True)
 
     plot_history(history, metrics_dir)
     evaluate_and_plot(model, val_gen, classes, metrics_dir)
