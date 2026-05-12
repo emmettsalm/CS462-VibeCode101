@@ -16,6 +16,7 @@ const multer   = require('multer');
 const AdmZip   = require('adm-zip');
 const tf       = require('@tensorflow/tfjs');
 const Jimp     = require('jimp');
+const { handleUpload: blobHandleUpload } = require('@vercel/blob/client');
 
 // Writable temp dir for uploaded model weights (Vercel-compatible)
 const TMP_TFJS = path.join(os.tmpdir(), 'thai_model_tfjs');
@@ -362,6 +363,46 @@ app.post('/api/upload_chunk',
     return processAssembled(assembled, filename, res);
   }
 );
+
+// ── Vercel Blob upload (bypasses 4.5 MB serverless body limit) ────────────
+// Step 1: client requests a short-lived upload token from this endpoint.
+// Step 2: @vercel/blob/client uploads the file directly to Vercel Blob.
+// Step 3: client POSTs the resulting blob URL to /api/load-from-blob.
+app.post('/api/blob-upload', express.json(), async (req, res) => {
+  try {
+    const jsonResponse = await blobHandleUpload({
+      body: req.body,
+      request: req,
+      onBeforeGenerateToken: async () => ({
+        maximumSizeInBytes: 100 * 1024 * 1024,
+        allowedContentTypes: [
+          'application/octet-stream',
+          'application/zip',
+          'application/x-zip-compressed',
+        ],
+      }),
+    });
+    return res.json(jsonResponse);
+  } catch (e) {
+    console.error('[Blob] handleUpload error:', e.message);
+    return res.status(400).json({ error: e.message });
+  }
+});
+
+app.post('/api/load-from-blob', express.json(), async (req, res) => {
+  const { url, filename } = req.body || {};
+  if (!url) return res.status(400).json({ error: 'No URL provided' });
+  try {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(`Blob fetch failed: ${r.status}`);
+    const buf = Buffer.from(await r.arrayBuffer());
+    console.log(`[Blob] downloaded ${buf.byteLength.toLocaleString()} bytes for "${filename}"`);
+    return processAssembled(buf, filename || 'model.zip', res);
+  } catch (e) {
+    console.error('[Blob] load-from-blob error:', e.message);
+    return res.status(500).json({ error: e.message });
+  }
+});
 
 // ── Reset to default model ────────────────────────────────────────────────
 app.post('/api/reset_model', async (_req, res) => {

@@ -119,7 +119,7 @@
       <!-- ── Upload ── -->
       <div class="admin-card glass-card">
         <p class="section-title">อัปโหลดโมเดลใหม่</p>
-        <p class="hint-text">รองรับ <strong>.h5 / .keras / .zip</strong> — ส่งเป็น chunk อัตโนมัติ ใช้ได้บน Vercel ด้วย (.zip = pre-converted)</p>
+        <p class="hint-text">รองรับ <strong>.h5 / .keras / .zip</strong> — อัปโหลดผ่าน Vercel Blob โดยตรง ไม่จำกัดขนาด</p>
 
         <div class="upload-zone" id="uploadZone">
           <div class="upload-icon">📦</div>
@@ -235,31 +235,34 @@
       btn.disabled = true;
       msg.style.display = 'none';
       prog.style.display = 'block';
-      bar.style.width = '0%';
-
-      const CHUNK = 3 * 1024 * 1024; // 3 MB per chunk (under Vercel 4.5 MB limit)
-      const total    = Math.ceil(file.size / CHUNK);
-      const uploadId = Date.now().toString(36);
+      bar.style.width = '5%';
 
       try {
-        let result = null;
-        for (let i = 0; i < total; i++) {
-          const chunk  = file.slice(i * CHUNK, (i + 1) * CHUNK);
-          const params = new URLSearchParams({ uploadId, index: i, total, filename: file.name });
-          const res    = await fetch(`/api/upload_chunk?${params}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/octet-stream' },
-            body: chunk,
-          });
-          const data = await res.json();
-          bar.style.width = Math.round((i + 1) / total * 100) + '%';
-          if (!res.ok) throw new Error(data.error || 'Upload failed');
-          if (data.done) { result = data; break; }
-        }
+        // Upload directly to Vercel Blob — bypasses the 4.5 MB serverless body limit
+        const { upload } = await import('https://esm.sh/@vercel/blob/client@2.3.3');
+        const blob = await upload(file.name, file, {
+          access: 'public',
+          handleUploadUrl: '/api/blob-upload',
+          onUploadProgress: ({ percentage }) => {
+            bar.style.width = Math.max(5, Math.round(percentage * 0.9)) + '%';
+          },
+        });
+
+        bar.style.width = '93%';
+
+        // Ask server to download from blob URL and load the model
+        const res  = await fetch('/api/load-from-blob', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ url: blob.url, filename: file.name }),
+        });
+        const data = await res.json();
+        bar.style.width = '100%';
+
         msg.style.display = 'block';
-        msg.className = 'upload-msg msg-success';
-        msg.textContent = '✅ ' + (result?.message || 'สำเร็จ');
-        if (result?.meta) { applyMeta(result.meta); checkStatus(); }
+        msg.className = 'upload-msg ' + (res.ok ? 'msg-success' : 'msg-error');
+        msg.textContent = (res.ok ? '✅ ' : '❌ ') + (data.message || data.error || 'เกิดข้อผิดพลาด');
+        if (res.ok && data.meta) { applyMeta(data.meta); checkStatus(); }
       } catch (e) {
         msg.style.display = 'block';
         msg.className = 'upload-msg msg-error';
