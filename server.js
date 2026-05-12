@@ -202,42 +202,86 @@ app.post('/api/predict', async (req, res) => {
 app.get('/api/model_status', (_req, res) =>
   res.json({ loaded: model !== null, meta: modelMeta }));
 
-// ── Upload pre-converted TFjs model as .zip ───────────────────────────────
-// zip must contain: weights.json  +  *.bin  (output of convert_model.py)
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
+// ── Helpers ───────────────────────────────────────────────────────────────
+function findPython() {
+  const { spawnSync } = require('child_process');
+  const candidates = process.platform === 'win32'
+    ? ['python', 'python3', 'py']
+    : ['python3', 'python'];
+  for (const cmd of candidates) {
+    const r = spawnSync(cmd, ['--version'], { encoding: 'utf-8' });
+    if (r.status === 0) return cmd;
+  }
+  return null;
+}
+
+// ── Upload model ──────────────────────────────────────────────────────────
+// Accepts:
+//   .h5 / .keras  →  convert via convert_model.py  (requires Python locally)
+//   .zip          →  must contain weights.json + *.bin  (works on Vercel too)
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 
 app.post('/api/upload_model', upload.single('model_file'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'ไม่พบไฟล์' });
 
-  if (path.extname(req.file.originalname).toLowerCase() !== '.zip') {
-    return res.status(400).json({ error: 'อัพโหลดไฟล์ .zip ที่มี weights.json และ *.bin' });
-  }
+  const ext = path.extname(req.file.originalname).toLowerCase();
 
-  try {
-    const zip     = new AdmZip(req.file.buffer);
-    const entries = zip.getEntries();
+  // ── .zip: extract weights.json + .bin directly ────────────────────────
+  if (ext === '.zip') {
+    try {
+      const zip     = new AdmZip(req.file.buffer);
+      const entries = zip.getEntries();
+      const jsonEntry = entries.find(e => !e.isDirectory && path.basename(e.entryName) === 'weights.json');
+      const binEntry  = entries.find(e => !e.isDirectory && e.entryName.endsWith('.bin'));
+      if (!jsonEntry || !binEntry)
+        return res.status(400).json({ error: 'zip ต้องมี weights.json และ *.bin' });
 
-    const jsonEntry = entries.find(e => !e.isDirectory && path.basename(e.entryName) === 'weights.json');
-    const binEntry  = entries.find(e => !e.isDirectory && e.entryName.endsWith('.bin'));
+      fs.mkdirSync(TMP_TFJS, { recursive: true });
+      const tmpJson = path.join(TMP_TFJS, 'weights.json');
+      const tmpBin  = path.join(TMP_TFJS, 'group1-shard1of1.bin');
+      fs.writeFileSync(tmpJson, jsonEntry.getData());
+      fs.writeFileSync(tmpBin,  binEntry.getData());
 
-    if (!jsonEntry || !binEntry) {
-      return res.status(400).json({ error: 'zip ต้องมี weights.json และ *.bin' });
+      const label = req.file.originalname.replace(/\.zip$/i, '');
+      const ok    = await loadModelFrom(tmpJson, tmpBin, label);
+      if (!ok) return res.status(500).json({ error: 'โหลดโมเดลใหม่ไม่สำเร็จ' });
+      return res.json({ message: `โหลด "${label}" สำเร็จ`, meta: modelMeta });
+    } catch (e) {
+      return res.status(500).json({ error: `อัพโหลดล้มเหลว: ${e.message}` });
     }
-
-    fs.mkdirSync(TMP_TFJS, { recursive: true });
-    const tmpJson = path.join(TMP_TFJS, 'weights.json');
-    const tmpBin  = path.join(TMP_TFJS, 'group1-shard1of1.bin');
-    fs.writeFileSync(tmpJson, jsonEntry.getData());
-    fs.writeFileSync(tmpBin,  binEntry.getData());
-
-    const label = req.file.originalname.replace(/\.zip$/i, '');
-    const ok    = await loadModelFrom(tmpJson, tmpBin, label);
-    if (!ok) return res.status(500).json({ error: 'โหลดโมเดลใหม่ไม่สำเร็จ' });
-
-    res.json({ message: `โหลด "${label}" สำเร็จ`, meta: modelMeta });
-  } catch (e) {
-    res.status(500).json({ error: `อัพโหลดล้มเหลว: ${e.message}` });
   }
+
+  // ── .h5 / .keras: convert with Python then load ───────────────────────
+  if (ext === '.h5' || ext === '.keras') {
+    const py = findPython();
+    if (!py)
+      return res.status(500).json({ error: 'ไม่พบ Python บน server — ใช้ .zip แทน (weights.json + .bin)' });
+
+    const tmpInput  = path.join(os.tmpdir(), 'thai_upload' + ext);
+    const tmpOutDir = path.join(os.tmpdir(), 'thai_upload_tfjs');
+    const convertScript = path.join(__dirname, 'convert_model.py');
+
+    try { fs.writeFileSync(tmpInput, req.file.buffer); }
+    catch (e) { return res.status(500).json({ error: `บันทึกไฟล์ชั่วคราวล้มเหลว: ${e.message}` }); }
+
+    const { execFile } = require('child_process');
+    execFile(py, [convertScript, '--input', tmpInput, '--output', tmpOutDir],
+      { timeout: 120_000 },
+      async (err) => {
+        try { fs.unlinkSync(tmpInput); } catch {}
+        if (err) return res.status(500).json({ error: `แปลงโมเดลล้มเหลว: ${err.message}` });
+
+        const tmpJson = path.join(tmpOutDir, 'weights.json');
+        const tmpBin  = path.join(tmpOutDir, 'group1-shard1of1.bin');
+        const ok = await loadModelFrom(tmpJson, tmpBin, req.file.originalname);
+        if (!ok) return res.status(500).json({ error: 'โหลดโมเดลใหม่ไม่สำเร็จ' });
+        return res.json({ message: `โหลด "${req.file.originalname}" สำเร็จ`, meta: modelMeta });
+      }
+    );
+    return;
+  }
+
+  return res.status(400).json({ error: 'รองรับเฉพาะ .h5, .keras, หรือ .zip' });
 });
 
 // ── Reset to default model ────────────────────────────────────────────────
