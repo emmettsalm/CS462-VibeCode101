@@ -27,8 +27,13 @@ MODEL_H5 = args.input
 OUT_DIR  = args.output
 os.makedirs(OUT_DIR, exist_ok=True)
 
+class _PatchedDense(tf.keras.layers.Dense):
+    def __init__(self, *args, **kwargs):
+        kwargs.pop("quantization_config", None)
+        super().__init__(*args, **kwargs)
+
 print(f"Loading {MODEL_H5} ...")
-model = tf.keras.models.load_model(MODEL_H5)
+model = tf.keras.models.load_model(MODEL_H5, custom_objects={"Dense": _PatchedDense})
 
 weights = model.trainable_weights + model.non_trainable_weights
 specs   = [{'name': w.name, 'shape': list(w.shape)} for w in weights]
