@@ -119,13 +119,13 @@
       <!-- ── Upload ── -->
       <div class="admin-card glass-card">
         <p class="section-title">อัปโหลดโมเดลใหม่</p>
-        <p class="hint-text">รองรับ .h5 และ .keras — ใช้ได้เฉพาะ Local mode</p>
+        <p class="hint-text">อัพโหลด <strong>.zip</strong> ที่มี <code>weights.json</code> + <code>*.bin</code> (รัน <code>convert_model.py</code> ก่อนแล้ว zip)</p>
 
         <div class="upload-zone" id="uploadZone">
           <div class="upload-icon">📦</div>
           <p>ลากไฟล์มาวางที่นี่ หรือ</p>
           <label class="btn btn-outline upload-label" for="modelFile">เลือกไฟล์</label>
-          <input type="file" id="modelFile" accept=".h5,.keras" style="display:none"
+          <input type="file" id="modelFile" accept=".zip" style="display:none"
                  onchange="handleFileSelect(this)" />
           <p id="selectedFileName" class="selected-file"></p>
         </div>

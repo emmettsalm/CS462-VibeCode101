@@ -11,9 +11,14 @@
 const express  = require('express');
 const path     = require('path');
 const fs       = require('fs');
+const os       = require('os');
 const multer   = require('multer');
+const AdmZip   = require('adm-zip');
 const tf       = require('@tensorflow/tfjs');
 const Jimp     = require('jimp');
+
+// Writable temp dir for uploaded model weights (Vercel-compatible)
+const TMP_TFJS = path.join(os.tmpdir(), 'thai_model_tfjs');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -197,33 +202,42 @@ app.post('/api/predict', async (req, res) => {
 app.get('/api/model_status', (_req, res) =>
   res.json({ loaded: model !== null, meta: modelMeta }));
 
-// ── Upload & convert new model ────────────────────────────────────────────
-const upload = multer({ dest: path.join(__dirname, 'models') });
+// ── Upload pre-converted TFjs model as .zip ───────────────────────────────
+// zip must contain: weights.json  +  *.bin  (output of convert_model.py)
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
+
 app.post('/api/upload_model', upload.single('model_file'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'ไม่พบไฟล์' });
 
-  const ext = path.extname(req.file.originalname).toLowerCase();
-  if (!['.h5', '.keras'].includes(ext)) {
-    fs.unlinkSync(req.file.path);
-    return res.status(400).json({ error: 'ใช้ .h5 หรือ .keras เท่านั้น' });
+  if (path.extname(req.file.originalname).toLowerCase() !== '.zip') {
+    return res.status(400).json({ error: 'อัพโหลดไฟล์ .zip ที่มี weights.json และ *.bin' });
   }
 
-  const dest = path.join(__dirname, 'models', 'model' + ext);
-  fs.renameSync(req.file.path, dest);
+  try {
+    const zip     = new AdmZip(req.file.buffer);
+    const entries = zip.getEntries();
 
-  const { execFile } = require('child_process');
-  const py = process.platform === 'win32'
-    ? 'C:\\Users\\emmet\\AppData\\Local\\Programs\\Python\\Python313\\python.exe'
-    : 'python3';
+    const jsonEntry = entries.find(e => !e.isDirectory && path.basename(e.entryName) === 'weights.json');
+    const binEntry  = entries.find(e => !e.isDirectory && e.entryName.endsWith('.bin'));
 
-  execFile(py, ['convert_model.py'], { cwd: __dirname }, async (err) => {
-    if (err) return res.status(500).json({ error: `แปลง model ล้มเหลว: ${err.message}` });
+    if (!jsonEntry || !binEntry) {
+      return res.status(400).json({ error: 'zip ต้องมี weights.json และ *.bin' });
+    }
 
-    const ok = await loadModelFrom(DEFAULT_JSON, DEFAULT_BIN, req.file.originalname);
+    fs.mkdirSync(TMP_TFJS, { recursive: true });
+    const tmpJson = path.join(TMP_TFJS, 'weights.json');
+    const tmpBin  = path.join(TMP_TFJS, 'group1-shard1of1.bin');
+    fs.writeFileSync(tmpJson, jsonEntry.getData());
+    fs.writeFileSync(tmpBin,  binEntry.getData());
+
+    const label = req.file.originalname.replace(/\.zip$/i, '');
+    const ok    = await loadModelFrom(tmpJson, tmpBin, label);
     if (!ok) return res.status(500).json({ error: 'โหลดโมเดลใหม่ไม่สำเร็จ' });
 
-    res.json({ message: `โหลด "${req.file.originalname}" สำเร็จ`, meta: modelMeta });
-  });
+    res.json({ message: `โหลด "${label}" สำเร็จ`, meta: modelMeta });
+  } catch (e) {
+    res.status(500).json({ error: `อัพโหลดล้มเหลว: ${e.message}` });
+  }
 });
 
 // ── Reset to default model ────────────────────────────────────────────────
