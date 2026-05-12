@@ -119,7 +119,7 @@
       <!-- ── Upload ── -->
       <div class="admin-card glass-card">
         <p class="section-title">อัปโหลดโมเดลใหม่</p>
-        <p class="hint-text">รองรับ <strong>.h5</strong> / <strong>.keras</strong> (ต้องมี Python บน server) &nbsp;หรือ&nbsp; <strong>.zip</strong> ที่มี <code>weights.json</code> + <code>*.bin</code> (รองรับ Vercel ด้วย)</p>
+        <p class="hint-text">รองรับ <strong>.h5 / .keras / .zip</strong> — ส่งเป็น chunk อัตโนมัติ ใช้ได้บน Vercel ด้วย (.zip = pre-converted)</p>
 
         <div class="upload-zone" id="uploadZone">
           <div class="upload-icon">📦</div>
@@ -224,38 +224,49 @@
 
     async function uploadModel() {
       const input = document.getElementById('modelFile');
-      if (!input.files[0]) return;
-
-      const formData = new FormData();
-      formData.append('model_file', input.files[0]);
+      const file  = input.files[0];
+      if (!file) return;
 
       const btn  = document.getElementById('uploadBtn');
       const msg  = document.getElementById('uploadMsg');
       const prog = document.getElementById('uploadProgress');
       const bar  = document.getElementById('progressBar');
 
-      btn.disabled = true; msg.style.display = 'none';
-      prog.style.display = 'block'; bar.style.width = '0%';
+      btn.disabled = true;
+      msg.style.display = 'none';
+      prog.style.display = 'block';
+      bar.style.width = '0%';
 
-      let pct = 0;
-      const timer = setInterval(() => { bar.style.width = Math.min(pct += 6, 85) + '%'; }, 250);
+      const CHUNK = 3 * 1024 * 1024; // 3 MB per chunk (under Vercel 4.5 MB limit)
+      const total    = Math.ceil(file.size / CHUNK);
+      const uploadId = Date.now().toString(36);
 
       try {
-        const res  = await fetch('/api/upload_model', { method: 'POST', body: formData });
-        const data = await res.json();
-        clearInterval(timer); bar.style.width = '100%';
+        let result = null;
+        for (let i = 0; i < total; i++) {
+          const chunk  = file.slice(i * CHUNK, (i + 1) * CHUNK);
+          const params = new URLSearchParams({ uploadId, index: i, total, filename: file.name });
+          const res    = await fetch(`/api/upload_chunk?${params}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/octet-stream' },
+            body: chunk,
+          });
+          const data = await res.json();
+          bar.style.width = Math.round((i + 1) / total * 100) + '%';
+          if (!res.ok) throw new Error(data.error || 'Upload failed');
+          if (data.done) { result = data; break; }
+        }
         msg.style.display = 'block';
-        msg.className = 'upload-msg ' + (res.ok ? 'msg-success' : 'msg-error');
-        msg.textContent = (res.ok ? '✅ ' : '❌ ') + (data.message || data.error);
-        if (res.ok) { applyMeta(data.meta); checkStatus(); }
+        msg.className = 'upload-msg msg-success';
+        msg.textContent = '✅ ' + (result?.message || 'สำเร็จ');
+        if (result?.meta) { applyMeta(result.meta); checkStatus(); }
       } catch (e) {
-        clearInterval(timer);
         msg.style.display = 'block';
         msg.className = 'upload-msg msg-error';
         msg.textContent = '❌ ' + e.message;
       } finally {
         btn.disabled = false;
-        setTimeout(() => { prog.style.display = 'none'; }, 1000);
+        setTimeout(() => { prog.style.display = 'none'; }, 1200);
       }
     }
 

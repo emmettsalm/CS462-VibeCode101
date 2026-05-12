@@ -284,6 +284,85 @@ app.post('/api/upload_model', upload.single('model_file'), async (req, res) => {
   return res.status(400).json({ error: 'รองรับเฉพาะ .h5, .keras, หรือ .zip' });
 });
 
+// ── Chunked upload (bypasses Vercel 4.5 MB body limit) ───────────────────
+// Client splits file into 3 MB chunks and POSTs each one separately.
+// Chunks are stored in /tmp until all arrive, then assembled and loaded.
+const CHUNK_BASE = path.join(os.tmpdir(), 'thai_chunks');
+
+async function processAssembled(buf, filename, res) {
+  const ext = path.extname(filename).toLowerCase();
+
+  if (ext === '.zip') {
+    try {
+      const zip       = new AdmZip(buf);
+      const entries   = zip.getEntries();
+      const jsonEntry = entries.find(e => !e.isDirectory && path.basename(e.entryName) === 'weights.json');
+      const binEntry  = entries.find(e => !e.isDirectory && e.entryName.endsWith('.bin'));
+      if (!jsonEntry || !binEntry)
+        return res.status(400).json({ error: 'zip ต้องมี weights.json และ *.bin' });
+      fs.mkdirSync(TMP_TFJS, { recursive: true });
+      const j = path.join(TMP_TFJS, 'weights.json');
+      const b = path.join(TMP_TFJS, 'group1-shard1of1.bin');
+      fs.writeFileSync(j, jsonEntry.getData());
+      fs.writeFileSync(b, binEntry.getData());
+      const label = filename.replace(/\.zip$/i, '');
+      const ok    = await loadModelFrom(j, b, label);
+      if (!ok) return res.status(500).json({ error: 'โหลดโมเดลล้มเหลว' });
+      return res.json({ done: true, message: `โหลด "${label}" สำเร็จ`, meta: modelMeta });
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
+  if (ext === '.h5' || ext === '.keras') {
+    const py = findPython();
+    if (!py) return res.status(500).json({ error: 'ไม่พบ Python บน server — ใช้ .zip แทน' });
+    const tmpIn  = path.join(os.tmpdir(), 'thai_up' + ext);
+    const tmpOut = path.join(os.tmpdir(), 'thai_up_tfjs');
+    fs.writeFileSync(tmpIn, buf);
+    const { execFile } = require('child_process');
+    execFile(py, [path.join(__dirname, 'convert_model.py'), '--input', tmpIn, '--output', tmpOut],
+      { timeout: 120_000 }, async (err) => {
+        try { fs.unlinkSync(tmpIn); } catch {}
+        if (err) return res.status(500).json({ error: `แปลงโมเดลล้มเหลว: ${err.message}` });
+        const j  = path.join(tmpOut, 'weights.json');
+        const b  = path.join(tmpOut, 'group1-shard1of1.bin');
+        const ok = await loadModelFrom(j, b, filename);
+        if (!ok) return res.status(500).json({ error: 'โหลดโมเดลล้มเหลว' });
+        return res.json({ done: true, message: `โหลด "${filename}" สำเร็จ`, meta: modelMeta });
+      });
+    return;
+  }
+
+  return res.status(400).json({ error: 'รองรับเฉพาะ .h5, .keras, .zip' });
+}
+
+app.post('/api/upload_chunk',
+  express.raw({ limit: '4mb', type: 'application/octet-stream' }),
+  async (req, res) => {
+    const { uploadId, index, total, filename } = req.query;
+    if (!uploadId || index === undefined || !total || !filename)
+      return res.status(400).json({ error: 'Missing params' });
+
+    const chunkDir = path.join(CHUNK_BASE, uploadId);
+    fs.mkdirSync(chunkDir, { recursive: true });
+    fs.writeFileSync(path.join(chunkDir, String(index).padStart(5, '0')), req.body);
+
+    const received = fs.readdirSync(chunkDir).length;
+    const totalN   = parseInt(total);
+    if (received < totalN)
+      return res.json({ done: false, received, total: totalN });
+
+    // All chunks received — assemble
+    const chunks = fs.readdirSync(chunkDir).sort()
+      .map(f => fs.readFileSync(path.join(chunkDir, f)));
+    const assembled = Buffer.concat(chunks);
+    try { fs.rmSync(chunkDir, { recursive: true, force: true }); } catch {}
+
+    return processAssembled(assembled, filename, res);
+  }
+);
+
 // ── Reset to default model ────────────────────────────────────────────────
 app.post('/api/reset_model', async (_req, res) => {
   const ok = await loadModelFrom(DEFAULT_JSON, DEFAULT_BIN, 'Default');
